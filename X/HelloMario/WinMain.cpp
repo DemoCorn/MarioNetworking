@@ -6,10 +6,13 @@
 #include "Goomba.h"
 #include "PowerUpManager.h"
 #include "GreenKoopa.h"
+#include "NetworkingComponents.h"
 
 enum class GameState
 {
 	Start,
+	Connect,
+	ServerStart,
 	Play,
 	Win,
 	Lose
@@ -140,6 +143,35 @@ void GameStateStart(float deltaTime)
 	DrawScreenText("Press Enter To Start!", 65.0f, 100.0f, 30.0f, Colors::White);
 	if (IsKeyPressed(Keys::ENTER))
 	{
+		currentState = GameState::Connect;
+	}
+}
+
+void GameStateConnect(float deltaTime)
+{
+	DrawScreenText("Press Space to Be Server", 65.0f, 100.0f, 30.0f, Colors::White);
+	if (IsKeyPressed(Keys::SPACE))
+	{
+		Server::StaticInitialize();
+		if (Server::Get().Startup())
+		{
+			currentState = GameState::ServerStart;
+		}
+		else
+		{
+			Server::StaticTerminate();
+		}
+	}
+}
+
+void GameStateServerStart(float deltaTime)
+{
+	Server::Get().Connect();
+	std::string message = "Connected Players: " + std::to_string(Server::Get().GetClientCount() + 1) + "/4";
+	DrawScreenText(message.c_str(), 65.0f, 80.0f, 30.0f, Colors::White);
+	DrawScreenText("Press Enter to Start", 65.0f, 100.0f, 30.0f, Colors::White);
+	if (IsKeyPressed(Keys::ENTER)) 
+	{
 		currentState = GameState::Play;
 	}
 }
@@ -244,6 +276,12 @@ bool GameLoop(float deltaTime)
 	case GameState::Play:
 		GameStatePlay(deltaTime);
 		break;
+	case GameState::Connect:
+		GameStateConnect(deltaTime);
+		break;
+	case GameState::ServerStart:
+		GameStateServerStart(deltaTime);
+		break;
 	case GameState::Win:
 		GameStateWin(deltaTime);
 		break;
@@ -258,6 +296,7 @@ bool GameLoop(float deltaTime)
 
 void GameCleanup()
 {
+	Server::Get().StaticTerminate();
 	mario.Unload();
 	TileMap::Get().Unload();
 }
