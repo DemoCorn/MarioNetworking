@@ -1,0 +1,8 @@
+{
+	"AppName": "Mario 1-1",
+	"WinWidth": 480,
+	"WinHeight": 240,
+	"FullScreen": false,
+	"SoundPath": "../Assets/Sounds",
+	"TexturePath": "../Assets/Images/Mario"
+}
