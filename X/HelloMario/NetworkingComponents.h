@@ -53,7 +53,7 @@ class Client
 public:
 	static void StaticInitialize();
 	static void StaticTerminate();
-	static Server& Get();
+	static Client& Get();
 
 	bool Startup();
 

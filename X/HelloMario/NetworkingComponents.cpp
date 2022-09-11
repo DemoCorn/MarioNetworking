@@ -244,10 +244,10 @@ void Client::StaticTerminate()
 
 	ClientInstance.reset();
 }
-Server& Client::Get()
+Client& Client::Get()
 {
-	XASSERT(ServerInstance != nullptr, "Client not yet created! Must call StaticInitialize first!");
-	return *ServerInstance;
+	XASSERT(ClientInstance != nullptr, "Client not yet created! Must call StaticInitialize first!");
+	return *ClientInstance;
 }
 
 bool Client::Startup()
@@ -272,7 +272,7 @@ bool Client::Startup()
 	struct sockaddr_in server_address;
 	server_address.sin_family = AF_INET;
 	server_address.sin_port = htons(mDefaultPort);
-	if (inet_pton(AF_INET, "127.0.0.1", &server_address.sin_addr) <= 0)
+	if (inet_pton(AF_INET, "10.197.221.153", &server_address.sin_addr) <= 0)
 	{
 		errNdie("inet_pton error\n");
 		return false;
