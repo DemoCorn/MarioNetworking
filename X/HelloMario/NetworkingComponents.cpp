@@ -189,7 +189,7 @@ bool Server::Connect()
 		if (mClients[i].socket == INVALID_SOCKET)
 		{
 			tmp_id = i;
-			return false;
+			break;
 		}
 	}
 
