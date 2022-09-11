@@ -13,6 +13,7 @@ enum class GameState
 	Start,
 	Connect,
 	ServerStart,
+	ClientStart,
 	Play,
 	Win,
 	Lose
@@ -25,6 +26,9 @@ GameState currentState;
 float iFrames = 0.0f;
 const float hitIFrames = 1.0f;
 const float ShellIFrames = 0.3f;
+
+bool isServer = false;
+bool isClient = false;
 
 using namespace X;
 
@@ -149,17 +153,32 @@ void GameStateStart(float deltaTime)
 
 void GameStateConnect(float deltaTime)
 {
-	DrawScreenText("Press Space to Be Server", 65.0f, 100.0f, 30.0f, Colors::White);
+	DrawScreenText("Press Space to Be Server", 65.0f, 70.0f, 30.0f, Colors::White);
+	DrawScreenText("Press Enter to Join Server", 65.0f, 100.0f, 30.0f, Colors::White);
 	if (IsKeyPressed(Keys::SPACE))
 	{
 		Server::StaticInitialize();
 		if (Server::Get().Startup())
 		{
+			isServer = true;
 			currentState = GameState::ServerStart;
 		}
 		else
 		{
 			Server::StaticTerminate();
+		}
+	}
+	if (IsKeyPressed(Keys::ENTER))
+	{
+		Client::StaticInitialize();
+		if (Client::Get().Startup())
+		{
+			isClient = true;
+			currentState = GameState::ClientStart;
+		}
+		else
+		{
+			Client::StaticTerminate();
 		}
 	}
 }
@@ -168,12 +187,17 @@ void GameStateServerStart(float deltaTime)
 {
 	Server::Get().Connect();
 	std::string message = "Connected Players: " + std::to_string(Server::Get().GetClientCount() + 1) + "/4";
-	DrawScreenText(message.c_str(), 65.0f, 80.0f, 30.0f, Colors::White);
+	DrawScreenText(message.c_str(), 65.0f, 70.0f, 30.0f, Colors::White);
 	DrawScreenText("Press Enter to Start", 65.0f, 100.0f, 30.0f, Colors::White);
 	if (IsKeyPressed(Keys::ENTER)) 
 	{
 		currentState = GameState::Play;
 	}
+}
+
+void GameStateClientStart(float deltaTime)
+{
+	DrawScreenText("Please Wait for Sever to Start", 65.0f, 100.0f, 30.0f, Colors::White);
 }
 
 void GameStatePlay(float deltaTime)
@@ -296,13 +320,24 @@ bool GameLoop(float deltaTime)
 
 void GameCleanup()
 {
-	Server::Get().StaticTerminate();
+	if (isServer)
+	{
+		Server::Get().StaticTerminate();
+	}
+
+	if (isClient)
+	{
+		Client::Get().StaticTerminate();
+	}
 	mario.Unload();
 	TileMap::Get().Unload();
 }
 
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 {
+	std::string name;
+	std::cin >> name;
+
 	Start("xConfig.json");
 	GameInit();
 
