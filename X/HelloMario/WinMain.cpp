@@ -22,6 +22,7 @@ const float blockTime = 5.0f;
 const float blockCooldown = 3.0f;
 const float goombaTime = 5.0f;
 const float goombaCooldown = 7.5f;
+const float goombaSpawnTime = 0.5f;
 
 float blockTimer = 0.0f;
 float goombaTimer = 0.0f;
@@ -63,7 +64,7 @@ void ResolveMessage(std::vector<std::string> message)
 	else if (message[0] == "G")
 	{
 		GoombaList.push_back(Goomba());
-		GoombaList[GoombaList.size() - 1].Load({ stof(message[1]), stof(message[2]) }, blockTime, stoi(message[3]), 0.5f);
+		GoombaList[GoombaList.size() - 1].Load({ stof(message[1]), stof(message[2]) }, blockTime, stoi(message[3]), goombaSpawnTime);
 	}
 	else if (message[0] == "B")
 	{
@@ -523,7 +524,7 @@ void GameStatePlay(float deltaTime)
 			if (IsMousePressed(0) && goombaTimer <= 0.0f)
 			{
 				GoombaList.push_back(Goomba());
-				GoombaList[GoombaList.size() - 1].Load(ClickPosition, blockTime, 0);
+				GoombaList[GoombaList.size() - 1].Load(ClickPosition, blockTime, 0, goombaSpawnTime);
 
 				goombaTimer = goombaCooldown;
 
