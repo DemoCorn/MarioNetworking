@@ -584,7 +584,7 @@ void GameStatePlay(float deltaTime)
 		PowerUpManager::Get()->at(i).Render();
 	}
 
-	if (mario.GetPosition().x >= 3184.0f)
+	if (mario.GetPosition().x >= 3184.0f && isPlayer)
 	{
 		currentState = GameState::Win;
 	}
