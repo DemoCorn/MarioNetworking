@@ -139,7 +139,7 @@ void DrawScore()
 		}
 		else
 		{
-			DrawScreenText(scoreMessage.c_str(), (spacePerScore / 2) + (spacePerScore * i) - 20.0f, 10.0f, 20.0f, Colors::White);
+			DrawScreenText(scoreMessage.c_str(), (spacePerScore / 2) + (spacePerScore * i) - 50.0f, 10.0f, 15.0f, Colors::White);
 		}
 	}
 }
