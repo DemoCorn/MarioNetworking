@@ -39,7 +39,7 @@ void Goomba::Update(float deltaTime)
 			isLoading = false;
 		}
 	}
-	if (mActive && isLoading)
+	if (mActive && !isLoading)
 	{
 		if (isTimed)
 		{
