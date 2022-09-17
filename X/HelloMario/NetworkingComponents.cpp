@@ -53,7 +53,6 @@ void Server::process_client(int id)
 
 	ClientInfo& client = mClients[id];
 	// client chat session
-	active[id] = true;
 	while (true)
 	{
 		memset(tmpmsg, 0, Default_BUFLEN);
