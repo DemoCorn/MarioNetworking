@@ -71,6 +71,7 @@ public:
 	int GetClientCount() { for (int i = 0; i < mClients.size(); i++) { if (mClients[i].id == -1) return i;} return mClients.size(); }
 
 	bool GetNewPlayer();
+	int GetCurrentPlayer() { return currentPlayer; }
 
 private:
 	int currentPlayer = 0;

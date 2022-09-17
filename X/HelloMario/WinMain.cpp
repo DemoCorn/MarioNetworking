@@ -626,13 +626,14 @@ void GameStateWin(float deltaTime)
 		}
 		else
 		{
-			scores[Client::Get().GetClientID() + 1]++;
+			scores[Client::Get().GetClientID() + 1] += scores.size() - 1;
 		}
 		SendScoreMessage();
 	}
 	if (isServer)
 	{
 		isPlayer = Server::Get().GetNewPlayer();
+		currentPlayer = Server::Get().GetCurrentPlayer();
 	}
 	Reset();
 	currentState = GameState::Play;
