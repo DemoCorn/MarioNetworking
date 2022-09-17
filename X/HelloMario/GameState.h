@@ -6,6 +6,7 @@ enum class GameState
 	Connect,
 	ServerStart,
 	ClientStart,
+	ClientWait,
 	Play,
 	Win,
 	Lose

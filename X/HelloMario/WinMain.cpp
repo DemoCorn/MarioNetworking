@@ -26,6 +26,7 @@ const float goombaCooldown = 7.5f;
 float blockTimer = 0.0f;
 float goombaTimer = 0.0f;
 
+std::string ip;
 bool isServer = false;
 bool isPlayer = false;
 
@@ -301,8 +302,8 @@ void GameStateStart(float deltaTime)
 
 void GameStateConnect(float deltaTime)
 {
-	DrawScreenText("Press Space to Be Server", 65.0f, 70.0f, 30.0f, Colors::White);
-	DrawScreenText("Press Enter to Join Server", 65.0f, 100.0f, 30.0f, Colors::White);
+	DrawScreenText("Press Space to Be Server", 35.0f, 70.0f, 30.0f, Colors::White);
+	DrawScreenText("Press Enter to Join Server", 25.0f, 100.0f, 30.0f, Colors::White);
 	if (IsKeyPressed(Keys::SPACE))
 	{
 		Server::StaticInitialize();
@@ -321,23 +322,15 @@ void GameStateConnect(float deltaTime)
 	if (IsKeyPressed(Keys::ENTER))
 	{
 		Client::StaticInitialize();
-		if (Client::Get().Startup())
-		{
-			Client::Get().Set(&currentState);
-			currentState = GameState::ClientStart;
-		}
-		else
-		{
-			Client::StaticTerminate();
-		}
+		currentState = GameState::ClientStart;
 	}
 }
 
 void GameStateServerStart(float deltaTime)
 {
 	std::string message = "Connected Players: " + std::to_string(Server::Get().GetClientCount() + 1) + "/4";
-	DrawScreenText(message.c_str(), 65.0f, 70.0f, 30.0f, Colors::White);
-	DrawScreenText("Press Enter to Start", 65.0f, 100.0f, 30.0f, Colors::White);
+	DrawScreenText(message.c_str(), 45.0f, 70.0f, 30.0f, Colors::White);
+	DrawScreenText("Press Enter to Start", 45.0f, 100.0f, 30.0f, Colors::White);
 	if (IsKeyPressed(Keys::ENTER)) 
 	{
 		for (int i = 0; i < Server::Get().GetClientCount() + 1; i++) { scores.push_back(0); }
@@ -350,7 +343,78 @@ void GameStateServerStart(float deltaTime)
 
 void GameStateClientStart(float deltaTime)
 {
-	DrawScreenText("Please Wait for Sever to Start", 65.0f, 100.0f, 30.0f, Colors::White);
+	DrawScreenText("Enter Server IPV4", 95.0f, 30.0f, 30.0f, Colors::White);
+	DrawScreenText("Shift to go back", 95.0f, 60.0f, 30.0f, Colors::White);
+	DrawScreenText("Enter to confirm", 95.0f, 90.0f, 30.0f, Colors::White);
+	DrawScreenText(ip.c_str(), 95.0f, 120.0f, 30.0f, Colors::Yellow);
+	if (IsKeyPressed(Keys::LSHIFT))
+	{
+		Client::StaticTerminate();
+		ip.clear();
+		currentState = GameState::Connect;
+	}
+	else if (IsKeyPressed(Keys::PERIOD))
+	{
+		ip.append(".");
+	}
+	else if (IsKeyPressed(Keys::ZERO))
+	{
+		ip.append("0");
+	}
+	else if (IsKeyPressed(Keys::ONE))
+	{
+		ip.append("1");
+	}
+	else if (IsKeyPressed(Keys::TWO))
+	{
+		ip.append("2");
+	}
+	else if (IsKeyPressed(Keys::THREE))
+	{
+		ip.append("3");
+	}
+	else if (IsKeyPressed(Keys::FOUR))
+	{
+		ip.append("4");
+	}
+	else if (IsKeyPressed(Keys::FIVE))
+	{
+		ip.append("5");
+	}
+	else if (IsKeyPressed(Keys::SIX))
+	{
+		ip.append("6");
+	}
+	else if (IsKeyPressed(Keys::SEVEN))
+	{
+		ip.append("7");
+	}
+	else if (IsKeyPressed(Keys::EIGHT))
+	{
+		ip.append("8");
+	}
+	else if (IsKeyPressed(Keys::NINE))
+	{
+		ip.append("9");
+	}
+	else if (IsKeyPressed(Keys::BACKSPACE))
+	{
+		ip.pop_back();
+	}
+	else if (IsKeyPressed(Keys::ENTER))
+	{
+		Client::Get().SetIP(ip);
+		if (Client::Get().Startup())
+		{
+			Client::Get().Set(&currentState);
+			currentState = GameState::ClientWait;
+		}
+	}
+}
+
+void GameStateClientWait(float deltaTime)
+{
+	DrawScreenText("Please Wait for Server to Start", 0.0f, 100.0f, 27.5f, Colors::White);
 }
 
 void GameStatePlay(float deltaTime)
@@ -565,6 +629,9 @@ bool GameLoop(float deltaTime)
 		break;
 	case GameState::ClientStart:
 		GameStateClientStart(deltaTime);
+		break;
+	case GameState::ClientWait:
+		GameStateClientWait(deltaTime);
 		break;
 	case GameState::Win:
 		GameStateWin(deltaTime);

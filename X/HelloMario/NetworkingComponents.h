@@ -92,7 +92,10 @@ public:
 
 	int GetClientID() { return mServer.id; }
 
+	void SetIP(std::string ip) { mIp = ip; }
+
 private:
 	ServerInfo mServer{ INVALID_SOCKET, -1, "" };
 	std::thread mReceiveThread;
+	std::string mIp;
 };
