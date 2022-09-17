@@ -610,6 +610,7 @@ void GameStateLose(float deltaTime)
 	if (isServer)
 	{
 		isPlayer = Server::Get().GetNewPlayer();
+		currentPlayer = Server::Get().GetCurrentPlayer();
 	}
 	Reset();
 	currentState = GameState::Play;
