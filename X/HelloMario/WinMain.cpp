@@ -63,7 +63,7 @@ void ResolveMessage(std::vector<std::string> message)
 	else if (message[0] == "G")
 	{
 		GoombaList.push_back(Goomba());
-		GoombaList[GoombaList.size() - 1].Load({ stof(message[1]), stof(message[2]) }, blockTime, stoi(message[3]));
+		GoombaList[GoombaList.size() - 1].Load({ stof(message[1]), stof(message[2]) }, blockTime, stoi(message[3]), 0.5f);
 	}
 	else if (message[0] == "B")
 	{
@@ -253,37 +253,40 @@ void CollisionCheck()
 
 	for (int i = 0; i < (int)GoombaList.size(); i++)
 	{
-		if (Math::Intersect(mario.GetBoundingBox(), GoombaList[i].GetBoundingBox()))
+		if (GoombaList[i].isLoading)
 		{
-			if (mario.GetVelocity().y > 0.0f)
+			if (Math::Intersect(mario.GetBoundingBox(), GoombaList[i].GetBoundingBox()))
+			{
+				if (mario.GetVelocity().y > 0.0f)
+				{
+					GoombaList[i].Unload();
+					GoombaList.erase(GoombaList.begin() + i);
+					mario.ChangeState(AnimationState::Jump);
+				}
+				else if (iFrames == 0.0f)
+				{
+					if (mario.Hit() && isPlayer)
+					{
+						currentState = GameState::Lose;
+						if (GoombaList[i].GetPlayerID() != -1)
+						{
+							scores[GoombaList[i].GetPlayerID()]++;
+							SendScoreMessage();
+						}
+					}
+					else
+					{
+						iFrames = hitIFrames;
+					}
+				}
+
+				break;
+			}
+			if (Math::Intersect(ThatOneKoopa.GetBoundingBox(), GoombaList[i].GetBoundingBox()) && ThatOneKoopa.GetShelled() && ThatOneKoopa.GetVelocity().x != 0)
 			{
 				GoombaList[i].Unload();
 				GoombaList.erase(GoombaList.begin() + i);
-				mario.ChangeState(AnimationState::Jump);
 			}
-			else if (iFrames == 0.0f)
-			{
-				if (mario.Hit() && isPlayer)
-				{
-					currentState = GameState::Lose;
-					if (GoombaList[i].GetPlayerID() != -1)
-					{
-						scores[GoombaList[i].GetPlayerID()]++;
-						SendScoreMessage();
-					}
-				}
-				else
-				{
-					iFrames = hitIFrames;
-				}
-			}
-
-			break;
-		}
-		if (Math::Intersect(ThatOneKoopa.GetBoundingBox(), GoombaList[i].GetBoundingBox()) && ThatOneKoopa.GetShelled() && ThatOneKoopa.GetVelocity().x != 0)
-		{
-			GoombaList[i].Unload();
-			GoombaList.erase(GoombaList.begin() + i);
 		}
 	}
 	if (Math::Intersect(mario.GetBoundingBox(), ThatOneKoopa.GetBoundingBox()))

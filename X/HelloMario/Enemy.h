@@ -6,7 +6,7 @@ class Enemy
 {
 public:
 	void virtual Load(X::Math::Vector2 position) = 0;
-	void virtual Load(X::Math::Vector2 position, float timeAlive, int playerID) = 0;
+	void virtual Load(X::Math::Vector2 position, float timeAlive, int playerID, float timeToSpawn) = 0;
 	void Unload();
 	void virtual Update(float deltaTime) = 0;
 	void Render();

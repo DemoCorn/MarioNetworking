@@ -12,7 +12,7 @@ void Goomba::Load(X::Math::Vector2 position)
 	mVelocity.x = -50.0f;
 }
 
-void Goomba::Load(X::Math::Vector2 position, float timeAlive, int ID)
+void Goomba::Load(X::Math::Vector2 position, float timeAlive, int ID, float timeToSpawn)
 {
 	mTextureId = X::LoadTexture("Goomba.png");
 
@@ -22,6 +22,8 @@ void Goomba::Load(X::Math::Vector2 position, float timeAlive, int ID)
 	mPosition = position;
 	mVelocity.x = -50.0f;
 
+	isLoading = true;
+	activateTimer = timeToSpawn;
 	isTimed = true;
 	timer = timeAlive;
 	playerID = ID;
@@ -29,7 +31,15 @@ void Goomba::Load(X::Math::Vector2 position, float timeAlive, int ID)
 
 void Goomba::Update(float deltaTime)
 {
-	if (mActive)
+	if (isLoading)
+	{
+		currentTimer += deltaTime;
+		if (currentTimer > activateTimer)
+		{
+			isLoading = false;
+		}
+	}
+	if (mActive && isLoading)
 	{
 		if (isTimed)
 		{

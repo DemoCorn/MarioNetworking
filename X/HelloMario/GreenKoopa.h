@@ -5,7 +5,7 @@ class GreenKoopa :
 {
 public:
     void virtual Load(X::Math::Vector2 position) override;
-    void virtual Load(X::Math::Vector2 position, float timeAlive, int playerID) { Load(position); };
+    void virtual Load(X::Math::Vector2 position, float timeAlive, int playerID, float timeToSpawn) { Load(position); };
     void Update(float deltaTime) override;
 
     bool GetShelled() { return mShelled; }
