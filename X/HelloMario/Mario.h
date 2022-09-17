@@ -7,10 +7,10 @@
 enum class AnimationState
 {
 	None = -1,
-	Idle,
-	Walk,
-	Jump,
-	Fall
+	Idle = 0,
+	Walk = 1,
+	Jump = 2,
+	Fall = 3
 };
 
 enum class PowerUpState
@@ -25,6 +25,7 @@ public:
 	void Load();
 	void Unload();
 	void Update(float deltaTime);
+	void NonPlayerUpdate(float deltaTime);
 	void Render();
 
 	void ChangeState(const AnimationState state);
@@ -32,6 +33,8 @@ public:
 	void SetVelocity(const X::Math::Vector2& velocity) { mVelocity = velocity; }
 	void SetFacingLeft(const bool facingLeft) { mIsFacingLeft = facingLeft; }
 	void SetJumpHeld(const bool JumpHeld) { mJumpHeld = JumpHeld; }
+	void SetPosition(const X::Math::Vector2& pos) { mPosition = pos; }
+	void SetLeft(bool left) { mIsFacingLeft = left; }
 
 	const X::Math::Vector2& GetPosition() const { return mPosition; }
 	const X::Math::Vector2& GetVelocity() const { return mVelocity; }
@@ -44,6 +47,7 @@ public:
 	bool GetFallSpeed() { return mFallSpeed; }
 	float GetMaxSpeed() { return X::IsKeyDown(X::Keys::LSHIFT) ? mMaxMoveSpeed * 2 : mMaxMoveSpeed; }
 	bool GetJumpHeld() { return mJumpHeld; }
+	AnimationState GetAnimationState() { return mAnimationState; }
 
 	X::Math::Rect GetBoundingBox() const;
 	bool IsFacingLeft() const { return mIsFacingLeft;  }
@@ -73,6 +77,7 @@ private:
 
 	PowerUpState mPowerUpState;
 
+	AnimationState mAnimationState;
 	std::shared_ptr<State> mCurrentState;
 	std::vector<std::shared_ptr<State>> mStates;
 };

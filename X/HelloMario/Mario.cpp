@@ -56,6 +56,11 @@ void Mario::Update(float deltaTime)
 	StopIfOutOfBounds(deltaTime);
 }
 
+void Mario::NonPlayerUpdate(float deltaTime)
+{
+	StopIfOutOfBounds(deltaTime);
+}
+
 void Mario::Render()
 {
 	mCurrentState->Render(*this);
@@ -73,6 +78,7 @@ X::Math::Rect Mario::GetBoundingBox() const
 
 void Mario::ChangeState(const AnimationState state)
 {
+	mAnimationState = state;
 	std::shared_ptr<State> newState = mStates.at(static_cast<int>(state));
 
 	if (mCurrentState == newState)

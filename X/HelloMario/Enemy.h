@@ -23,6 +23,7 @@ public:
 	}
 
 	void SetPosition(const X::Math::Vector2& position) { mPosition = position; }
+	const int GetPlayerID() { return playerID; }
 	const X::Math::Vector2& GetPosition() const { return mPosition; }
 	const X::Math::Vector2& GetVelocity() const { return mVelocity; }
 
@@ -53,7 +54,7 @@ protected:
 
 	bool isTimed = false;
 	float timer = 0.0f;
-	int playerID = 0;
+	int playerID = -1;
 
 	float mHalfSpriteWidth = 0.0f;
 	float mSpriteHeight = 0.0f;

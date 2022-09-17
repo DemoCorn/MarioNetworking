@@ -7,30 +7,128 @@
 #include "PowerUpManager.h"
 #include "GreenKoopa.h"
 #include "NetworkingComponents.h"
-
-enum class GameState
-{
-	Start,
-	Connect,
-	ServerStart,
-	ClientStart,
-	Play,
-	Win,
-	Lose
-};
+#include "GameState.h"
 
 Mario mario;
 std::vector<Goomba> GoombaList;
 GreenKoopa ThatOneKoopa;
 GameState currentState;
+std::vector<int> scores;
 float iFrames = 0.0f;
 const float hitIFrames = 1.0f;
 const float ShellIFrames = 0.3f;
 
+const float blockTime = 5.0f;
+const float blockCooldown = 3.0f;
+const float goombaTime = 5.0f;
+const float goombaCooldown = 7.5f;
+
+float blockTimer = 0.0f;
+float goombaTimer = 0.0f;
+
 bool isServer = false;
-bool isClient = false;
+bool isPlayer = false;
 
 using namespace X;
+
+std::vector<std::string> StringSplit(std::string toSplit, char splitter = ' ')
+{
+	std::stringstream split(toSplit);
+	std::string segment;
+	std::vector<std::string> seglist;
+
+	while (std::getline(split, segment, splitter))
+	{
+		seglist.push_back(segment);
+	}
+	return seglist;
+}
+
+void ResolveMessage(std::vector<std::string> message)
+{
+	if (message.size() == 0)
+	{
+		return;
+	}
+
+	if (message[0] == "M")
+	{
+		mario.SetPosition({ stof(message[1]), stof(message[2]) });
+		mario.SetVelocity({ 0, stof(message[3]) });
+		mario.ChangeState(static_cast<AnimationState>(stoi(message[4])));
+		mario.SetLeft(stoi(message[5]));
+	}
+	else if (message[0] == "G")
+	{
+		GoombaList.push_back(Goomba());
+		GoombaList[GoombaList.size() - 1].Load({ stof(message[1]), stof(message[2]) }, blockTime, stoi(message[3]));
+	}
+	else if (message[0] == "B")
+	{
+		TileMap::Get().AddBlock({ stof(message[1]), stof(message[2]) }, blockTime, 0);
+	}
+	else if (message[0] == "L")
+	{
+		currentState = GameState::Lose;
+	}
+	else if (message[0] == "W")
+	{
+		currentState = GameState::Win;
+	}
+	else if (message[0] == "P")
+	{
+		if (!isServer)
+		{
+			if (Client::Get().GetClientID() == stoi(message[1]))
+			{
+				isPlayer = true;
+			}
+			else
+			{
+				isPlayer = false;
+			}
+		}
+	}
+	else if (message[0] == "S")
+	{
+		scores.clear();
+		for (int i = 1; i < message.size(); i++)
+		{
+			scores.push_back(stoi(message[i]));
+		}
+	}
+}
+
+int GetID()
+{
+	if (isServer)
+	{
+		return 0;
+	}
+	return Client::Get().GetClientID() + 1;
+}
+
+void DrawScore()
+{
+	float screenWidth = X::GetScreenWidth();
+	float spacePerScore = screenWidth / scores.size();
+
+	for (int i = 0; i < scores.size(); i++)
+	{
+		std::string scoreMessage = "P" + std::to_string(i+1) + ": " + std::to_string(scores[i]);
+		DrawScreenText(scoreMessage.c_str(), (spacePerScore / 2) + (spacePerScore * i) - 20.0f, 10.0f, 20.0f, Colors::White);
+	}
+}
+
+void SendScoreMessage()
+{
+	std::string message = "S";
+	for (int score : scores)
+	{
+		message.append(" " + std::to_string(score));
+	}
+	NetworkingComponent::Send(message, isServer);
+}
 
 void GameInit()
 {
@@ -71,6 +169,51 @@ void GameInit()
 	SetBackgroundColor(Color(0.57f, 0.73f, 0.92f, 1.0f));
 }
 
+void Reset()
+{
+	Camera::Get().Reset();
+
+	mario.SetPosition({ 20.0f, 207.0f });
+	mario.SetVelocity({ 0.0f,0.0f });
+	mario.SetLeft(false);
+	mario.SetPowerUpState(PowerUpState::Small);
+
+	TileMap::Get().Load("Level_01.txt", "tileset_01.txt");
+	SetBackgroundColor(Color(0.57f, 0.73f, 0.92f, 1.0f));
+
+	for (int i = 0; i < GoombaList.size(); i++) {
+		GoombaList[i].Unload();
+	}
+	GoombaList.clear();
+	for (int i = 0; i < 14; i++) {
+		GoombaList.push_back(Goomba());
+	}
+
+	GoombaList[0].Load(Math::Vector2(23.0f * 16.0f - 8.0f, 207.0f));
+	GoombaList[1].Load(Math::Vector2(41.0f * 16.0f - 8.0f, 207.0f));
+	GoombaList[2].Load(Math::Vector2(52.0f * 16.0f - 8.0f, 207.0f));
+	GoombaList[3].Load(Math::Vector2(54.0f * 16.0f, 207.0f));
+
+	GoombaList[4].Load(Math::Vector2(81.0f * 16.0f - 8.0f, 79.0f));
+	GoombaList[5].Load(Math::Vector2(83.0f * 16.0f - 8.0f, 79.0f));
+
+	GoombaList[6].Load(Math::Vector2(98.0f * 16.0f - 8.0f, 207.0f));
+	GoombaList[7].Load(Math::Vector2(100.0f * 16.0f, 207.0f));
+
+	ThatOneKoopa.Load(Math::Vector2(108.0f * 16.0f, 207.0f));
+
+	GoombaList[8].Load(Math::Vector2(115.0f * 16.0f - 8.0f, 207.0f));
+	GoombaList[9].Load(Math::Vector2(117.0f * 16.0f, 207.0f));
+
+	GoombaList[10].Load(Math::Vector2(125.0f * 16.0f - 8.0f, 207.0f));
+	GoombaList[11].Load(Math::Vector2(127.0f * 16.0f, 207.0f));
+	GoombaList[12].Load(Math::Vector2(129.0f * 16.0f - 8.0f, 207.0f));
+	GoombaList[13].Load(Math::Vector2(131.0f * 16.0f, 207.0f));
+
+	GoombaList[12].Load(Math::Vector2(175.0f * 16.0f - 8.0f, 207.0f));
+	GoombaList[13].Load(Math::Vector2(177.0f * 16.0f, 207.0f));
+}
+
 void CollisionCheck()
 {
 	for (int i = 0; i < (int)PowerUpManager::Get()->size(); i++)
@@ -83,6 +226,7 @@ void CollisionCheck()
 			break;
 		}
 	}
+
 	for (int i = 0; i < (int)GoombaList.size(); i++)
 	{
 		if (Math::Intersect(mario.GetBoundingBox(), GoombaList[i].GetBoundingBox()))
@@ -95,9 +239,14 @@ void CollisionCheck()
 			}
 			else if (iFrames == 0.0f)
 			{
-				if (mario.Hit())
+				if (mario.Hit() && isPlayer)
 				{
 					currentState = GameState::Lose;
+					if (GoombaList[i].GetPlayerID() != -1)
+					{
+						scores[GoombaList[i].GetPlayerID()]++;
+						SendScoreMessage();
+					}
 				}
 				else
 				{
@@ -115,7 +264,7 @@ void CollisionCheck()
 	}
 	if (Math::Intersect(mario.GetBoundingBox(), ThatOneKoopa.GetBoundingBox()))
 	{
-		if (mario.GetVelocity().y > 0.0f or (ThatOneKoopa.GetShelled() and ThatOneKoopa.GetVelocity().x == 0))
+		if (mario.GetVelocity().y > 0.0f || (ThatOneKoopa.GetShelled() && ThatOneKoopa.GetVelocity().x == 0))
 		{
 			ThatOneKoopa.Hit(mario.GetPosition());
 			if (mario.GetVelocity().y > 0.0f)
@@ -129,7 +278,7 @@ void CollisionCheck()
 		}
 		else if (iFrames == 0.0f)
 		{
-			if (mario.Hit())
+			if (mario.Hit() && isPlayer)
 			{
 				currentState = GameState::Lose;
 			}
@@ -139,7 +288,6 @@ void CollisionCheck()
 			}
 		}
 	}
-
 }
 
 void GameStateStart(float deltaTime)
@@ -161,6 +309,8 @@ void GameStateConnect(float deltaTime)
 		if (Server::Get().Startup())
 		{
 			isServer = true;
+			isPlayer = true;
+			Server::Get().Set(&currentState);
 			currentState = GameState::ServerStart;
 		}
 		else
@@ -173,7 +323,7 @@ void GameStateConnect(float deltaTime)
 		Client::StaticInitialize();
 		if (Client::Get().Startup())
 		{
-			isClient = true;
+			Client::Get().Set(&currentState);
 			currentState = GameState::ClientStart;
 		}
 		else
@@ -185,12 +335,15 @@ void GameStateConnect(float deltaTime)
 
 void GameStateServerStart(float deltaTime)
 {
-	Server::Get().Connect();
 	std::string message = "Connected Players: " + std::to_string(Server::Get().GetClientCount() + 1) + "/4";
 	DrawScreenText(message.c_str(), 65.0f, 70.0f, 30.0f, Colors::White);
 	DrawScreenText("Press Enter to Start", 65.0f, 100.0f, 30.0f, Colors::White);
 	if (IsKeyPressed(Keys::ENTER)) 
 	{
+		for (int i = 0; i < Server::Get().GetClientCount() + 1; i++) { scores.push_back(0); }
+		Server::Get().Send("Play");
+		SendScoreMessage();
+
 		currentState = GameState::Play;
 	}
 }
@@ -202,31 +355,105 @@ void GameStateClientStart(float deltaTime)
 
 void GameStatePlay(float deltaTime)
 {
-	TileMap::Get().Update(deltaTime);
-	mario.Update(deltaTime);
-
-	if (IsMousePressed(0) || IsMousePressed(1))
+	std::vector<std::string>* messages;
+	std::unique_lock<std::mutex> lock;
+	if (isServer)
 	{
-		Math::Vector2 ClickPosition(Math::Vector2(GetMouseScreenX(), GetMouseScreenY()));
-		ClickPosition = Camera::Get().ConvertToWorldPosition(ClickPosition);
-		Math::Vector2 offset(Math::Vector2((int)ClickPosition.x % 16, (int)ClickPosition.y % 16));
-
-		ClickPosition = {
-			offset.x >= 8 ? ClickPosition.x + (16.0f - offset.x) : ClickPosition.x - offset.x,
-			offset.y >= 8 ? ClickPosition.y + (16.0f - offset.y) : ClickPosition.y - offset.y
-		};
-
-		if (IsMousePressed(0))
-		{
-			GoombaList.push_back(Goomba());
-			GoombaList[GoombaList.size() - 1].Load(ClickPosition, 10.0f, 0);
-		}
-		else if (IsMousePressed(1))
-		{
-			TileMap::Get().AddBlock(ClickPosition, 10.0f, 0);
-		}
+		lock = { Server::Get().m, std::defer_lock };
+		messages = &Server::Get().messages;
+	}
+	else
+	{
+		lock = { Client::Get().m, std::defer_lock };
+		messages = &Client::Get().messages;
 	}
 
+	if (lock.try_lock())
+	{
+		while (messages->size() > 0)
+		{
+			std::vector<std::string> splitMessage = StringSplit((*messages)[0], ' ');
+
+			ResolveMessage(splitMessage);
+
+			messages->erase(messages->begin());
+
+			if (currentState == GameState::Lose || currentState == GameState::Win)
+			{
+				lock.unlock();
+				return;
+			}
+		}
+		lock.unlock();
+	}
+
+	DrawScore();
+
+	if (goombaTimer > 0.0f)
+	{
+		goombaTimer -= deltaTime;
+	}
+	if (blockTimer > 0.0f)
+	{
+		blockTimer -= deltaTime;
+	}
+
+	TileMap::Get().Update(deltaTime);
+	if (isPlayer)
+	{
+		mario.Update(deltaTime);
+
+		Math::Vector2 pos{ mario.GetPosition() };
+		AnimationState anim{ mario.GetAnimationState() };
+		std::string message{ "M " + std::to_string(pos.x) + " " + std::to_string(pos.y) + " " + std::to_string(mario.GetVelocity().y)
+						+ " " + std::to_string(static_cast<int>(anim)) + " " + std::to_string(mario.IsFacingLeft())};
+
+		NetworkingComponent::Send(message, isServer);
+	}
+	else
+	{
+		mario.NonPlayerUpdate(deltaTime);
+	}
+
+	if (!isPlayer)
+	{
+		if (IsMousePressed(0) || IsMousePressed(1))
+		{
+			Math::Vector2 ClickPosition(Math::Vector2(GetMouseScreenX(), GetMouseScreenY()));
+			ClickPosition = Camera::Get().ConvertToWorldPosition(ClickPosition);
+			Math::Vector2 offset(Math::Vector2((int)ClickPosition.x % 16, (int)ClickPosition.y % 16));
+
+			ClickPosition = {
+				offset.x >= 8 ? ClickPosition.x + (16.0f - offset.x) : ClickPosition.x - offset.x,
+				offset.y >= 8 ? ClickPosition.y + (16.0f - offset.y) : ClickPosition.y - offset.y
+			};
+
+			std::string message = "";
+
+			if (IsMousePressed(0) && goombaTimer <= 0.0f)
+			{
+				GoombaList.push_back(Goomba());
+				GoombaList[GoombaList.size() - 1].Load(ClickPosition, blockTime, 0);
+
+				goombaTimer = goombaCooldown;
+
+				message = "G " + std::to_string(ClickPosition.x) + " " + std::to_string(ClickPosition.y) + " " + std::to_string(GetID());
+			}
+			else if (IsMousePressed(1) && blockTimer <= 0.0f)
+			{
+				TileMap::Get().AddBlock(ClickPosition, goombaTime, 0);
+
+				blockTimer = blockCooldown;
+
+				message = "B " + std::to_string(ClickPosition.x) + " " + std::to_string(ClickPosition.y);
+			}
+
+			if (!message.empty())
+			{
+				NetworkingComponent::Send(message, isServer);
+			}
+		}
+	}
 
 	ThatOneKoopa.Update(deltaTime);
 
@@ -235,6 +462,7 @@ void GameStatePlay(float deltaTime)
 		GoombaList[i].Update(deltaTime);
 		if (GoombaList[i].TimeUp())
 		{
+			GoombaList[i].Unload();
 			GoombaList.erase(GoombaList.begin() + i);
 			i--;
 		}
@@ -269,7 +497,7 @@ void GameStatePlay(float deltaTime)
 	{
 		currentState = GameState::Win;
 	}
-	if (mario.GetPosition().y > GetScreenHeight())
+	if (mario.GetPosition().y > GetScreenHeight() && isPlayer)
 	{
 		currentState = GameState::Lose;
 	}
@@ -282,12 +510,41 @@ void GameStatePlay(float deltaTime)
 }
 
 
-void GameStateLose(float deltaTime) {
-	DrawScreenText("You Died", 135.0f, 100.0f, 50.0f, Colors::White);
+void GameStateLose(float deltaTime) 
+{
+	if (isPlayer)
+	{
+		NetworkingComponent::Send("L", isServer);
+	}
+	if (isServer)
+	{
+		isPlayer = Server::Get().GetNewPlayer();
+	}
+	Reset();
+	currentState = GameState::Play;
 }
 
-void GameStateWin(float deltaTime) {
-	DrawScreenText("You Win", 135.0f, 100.0f, 50.0f, Colors::White);
+void GameStateWin(float deltaTime) 
+{
+	if (isPlayer)
+	{
+		NetworkingComponent::Send("W", isServer);
+		if (isServer)
+		{
+			scores[0] += scores.size() - 1;
+		}
+		else
+		{
+			scores[Client::Get().GetClientID() + 1]++;
+		}
+		SendScoreMessage();
+	}
+	if (isServer)
+	{
+		isPlayer = Server::Get().GetNewPlayer();
+	}
+	Reset();
+	currentState = GameState::Play;
 }
 
 bool GameLoop(float deltaTime)
@@ -306,6 +563,9 @@ bool GameLoop(float deltaTime)
 	case GameState::ServerStart:
 		GameStateServerStart(deltaTime);
 		break;
+	case GameState::ClientStart:
+		GameStateClientStart(deltaTime);
+		break;
 	case GameState::Win:
 		GameStateWin(deltaTime);
 		break;
@@ -320,14 +580,16 @@ bool GameLoop(float deltaTime)
 
 void GameCleanup()
 {
-	if (isServer)
+	if (currentState != GameState::Connect && currentState != GameState::Start)
 	{
-		Server::Get().StaticTerminate();
-	}
-
-	if (isClient)
-	{
-		Client::Get().StaticTerminate();
+		if (isServer)
+		{
+			Server::Get().StaticTerminate();
+		}
+		else
+		{
+			Client::Get().StaticTerminate();
+		}
 	}
 	mario.Unload();
 	TileMap::Get().Unload();

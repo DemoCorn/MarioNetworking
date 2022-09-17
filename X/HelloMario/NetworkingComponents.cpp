@@ -6,86 +6,106 @@
 
 #pragma comment(lib, "Ws2_32.lib")
 
-namespace
+void errNdie(const char* msg)
 {
-	void errNdie(const char* msg)
+	std::cout << msg << std::endl;
+}
+
+void NetworkingComponent::Set(GameState* state)
+{
+	mGameState = state;
+}
+
+const void NetworkingComponent::Send(std::string message, bool isServer)
+{
+	if (isServer)
 	{
-		std::cout << msg << std::endl;
+		Server::Get().Send(message);
 	}
-
-	void process_client(int id, std::array<ClientInfo, MAX_CLIENTS>& clients)
+	else
 	{
-		std::string msg{};
-		char tmpmsg[Default_BUFLEN]{ "" };
+		Client::Get().Send(message);
+	}
+}
 
-		ClientInfo& client = clients[id];
-		// client chat session
-		while (true)
+std::unique_ptr<Server> ServerInstance = nullptr;
+std::unique_ptr<Client> ClientInstance = nullptr;
+
+#pragma region Server
+bool Server::Send(std::string message)
+{
+	mConnecting = false;
+	for (int i = 0; i < mClients.size(); ++i)
+	{
+		if (mClients[i].socket != INVALID_SOCKET)
 		{
-			memset(tmpmsg, 0, Default_BUFLEN);
-			if (client.socket != INVALID_SOCKET)
+			send(mClients[i].socket, message.c_str(), strlen(message.c_str()), 0);
+		}
+	}
+	return true;
+}
+
+void Server::process_client(int id)
+{
+	std::unique_lock<std::mutex> lock{ m, std::defer_lock };
+	std::string msg{};
+	char tmpmsg[Default_BUFLEN]{ "" };
+
+	ClientInfo& client = mClients[id];
+	// client chat session
+	while (true)
+	{
+		memset(tmpmsg, 0, Default_BUFLEN);
+		if (client.socket != INVALID_SOCKET)
+		{
+			int iRes = recv(client.socket, tmpmsg, Default_BUFLEN, 0);
+			if (iRes != SOCKET_ERROR)
 			{
-				int iRes = recv(client.socket, tmpmsg, Default_BUFLEN, 0);
-				if (iRes != SOCKET_ERROR)
+				if (strcmp("", tmpmsg) != 0)
 				{
-					if (strcmp("", tmpmsg) != 0)
-						msg = "Client #" + std::to_string(client.id) + ": " + tmpmsg;
-					std::cout << msg << std::endl;
-
-					//broadcast the msg to the other clients:
-					for (int i = 0; i < clients.size(); ++i)
+					if (lock.try_lock())
 					{
-						if (clients[i].socket != INVALID_SOCKET && client.id != i)
-							send(clients[i].socket, msg.c_str(), strlen(msg.c_str()), 0);
+						for (std::string message : backlog)
+						{
+							messages.push_back(message);
+						}
+						backlog.clear();
+						messages.push_back(tmpmsg);
+						lock.unlock();
+					}
+					else
+					{
+						backlog.push_back(tmpmsg);
 					}
 				}
-				else // means this client socket is not alive anymore
+
+				//broadcast the msg to the other clients:
+				for (int i = 0; i < mClients.size(); ++i)
 				{
-					msg = "Client #" + std::to_string(client.id) + " Disconnected";
-					std::cout << msg << std::endl;
-					closesocket(client.socket);
-					clients[client.id].socket = INVALID_SOCKET;
-
-					// broadcast the disconnection messsage to the other clients
-					for (int i = 0; i < MAX_CLIENTS; ++i)
-					{
-						if ((clients[i].socket != INVALID_SOCKET))
-							send(clients[i].socket, msg.c_str(), strlen(msg.c_str()), 0);
-					}
-
-					break; // stop chat session for this client
+					if (mClients[i].socket != INVALID_SOCKET && client.id != i)
+						send(mClients[i].socket, msg.c_str(), strlen(msg.c_str()), 0);
 				}
+			}
+			else // means this client socket is not alive anymore
+			{
+				msg = "Client #" + std::to_string(client.id) + " Disconnected";
+				std::cout << msg << std::endl;
+				closesocket(client.socket);
+				mClients[client.id].socket = INVALID_SOCKET;
+
+				// broadcast the disconnection messsage to the other clients
+				for (int i = 0; i < MAX_CLIENTS; ++i)
+				{
+					if ((mClients[i].socket != INVALID_SOCKET))
+						send(mClients[i].socket, msg.c_str(), strlen(msg.c_str()), 0);
+				}
+
+				break; // stop chat session for this client
 			}
 		}
 	}
-
-	void processReceives(ServerInfo& server)
-	{
-		while (true)
-		{
-			memset(server.receivedMsg, 0, Default_BUFLEN);
-			if (server.socket != INVALID_SOCKET)
-			{
-				int iResult = recv(server.socket, server.receivedMsg, Default_BUFLEN, 0);
-				if (iResult != SOCKET_ERROR)
-					std::cout << server.receivedMsg << std::endl;
-				else
-				{
-					std::cout << "recv() failed: error = " << WSAGetLastError() << std::endl;
-					break;
-				}
-			}
-		} // while 
-
-		if (WSAGetLastError() == WSAECONNRESET)
-			std::cout << "The server has disconnected\n";
-	}
-	
-	std::unique_ptr<Server> ServerInstance = nullptr;
-	std::unique_ptr<Client> ClientInstance = nullptr;
 }
 
-#pragma region Server
 void Server::StaticInitialize()
 {
 	XASSERT(ServerInstance == nullptr, "Sever already initialized!");
@@ -137,13 +157,6 @@ bool Server::Startup()
 	setsockopt(mServerSocket, SOL_SOCKET, SO_REUSEADDR, &VALUE, sizeof(int));  // make it possible to reuse the addresses that have not been used for last 2 minutes
 	setsockopt(mServerSocket, IPPROTO_TCP, TCP_NODELAY, &VALUE, sizeof(int));  // instruct the transport layer to send every message immediately
 
-	DWORD nonBlocking{ 1 };
-	if (ioctlsocket(mServerSocket, FIONBIO, &nonBlocking) != 0)
-	{
-		std::cout << "ioctlsocket failed with error " << WSAGetLastError() << std::endl;
-		return false;
-	}
-
 	// assign address to our listening socket
 	struct sockaddr_in servaddr;
 	ZeroMemory(&servaddr, sizeof(servaddr));
@@ -164,72 +177,151 @@ bool Server::Startup()
 		return false;
 	}
 
+	mConnecting = true;
+	std::thread connect = std::thread(&Server::Connect, this);
+	connect.detach();
+
 	return true;
 }
 
-bool Server::Connect()
+void Server::Connect()
 {
-	sockaddr clientAddr;
-	int clientAddLen{ sizeof(clientAddr) };
-	std::cout << "Server is listening...\n";
-	ZeroMemory(&clientAddr, clientAddLen);
-	SOCKET incoming = accept(mServerSocket, (struct sockaddr*)&clientAddr, &clientAddLen);
-	if (incoming == INVALID_SOCKET)
+	while (mConnecting)
 	{
-		std::cout << "accept reported invalid socket: error code is " << WSAGetLastError() <<
-			"We ignore it for now.\n";
-		return false;
-	}
-	std::cout << "Accepted a  client\n";
-
-	// find the first clientinfo object with id == -1, to use for this new client.
-	int tmp_id{ -1 };
-	for (int i = 0; i < mClients.size(); ++i)
-	{
-		if (mClients[i].socket == INVALID_SOCKET)
+		sockaddr clientAddr;
+		int clientAddLen{ sizeof(clientAddr) };
+		std::cout << "Server is listening...\n";
+		ZeroMemory(&clientAddr, clientAddLen);
+		SOCKET incoming = accept(mServerSocket, (struct sockaddr*)&clientAddr, &clientAddLen);
+		if (incoming == INVALID_SOCKET)
 		{
-			tmp_id = i;
-			break;
+			std::cout << "accept reported invalid socket: error code is " << WSAGetLastError() <<
+				"We ignore it for now.\n";
+			return;
+		}
+		std::cout << "Accepted a  client\n";
+
+		// find the first clientinfo object with id == -1, to use for this new client.
+		int tmp_id{ -1 };
+		for (int i = 0; i < mClients.size(); ++i)
+		{
+			if (mClients[i].socket == INVALID_SOCKET)
+			{
+				tmp_id = i;
+				break;
+			}
+		}
+
+		// extract ip address and port of the new client: deal with both IPV4 and IPV6
+		char ipstr[INET6_ADDRSTRLEN];
+		int clientport{};
+		if (clientAddr.sa_family == AF_INET)
+		{
+			struct sockaddr_in* s = (struct sockaddr_in*)&clientAddr;
+			clientport = ntohs(s->sin_port);
+			inet_ntop(AF_INET, &s->sin_addr, ipstr, sizeof(ipstr));
+		}
+		else // means ipv6
+		{
+			struct sockaddr_in6* s = (struct sockaddr_in6*)&clientAddr;
+			clientport = ntohs(s->sin6_port);
+			inet_ntop(AF_INET6, &s->sin6_addr, ipstr, sizeof(ipstr));
+		}
+		std::cout << "Client ip address: " << ipstr << ", client port: " << clientport << std::endl;
+		if (tmp_id != -1)
+		{
+			// send the id to the client:
+			std::string msg{ std::to_string(tmp_id) };
+			send(incoming, msg.c_str(), strlen(msg.c_str()), 0);
+
+			// add the client to the clientinfo list:
+			mClients[tmp_id].set(tmp_id, incoming, clientAddr);
+			mClients[tmp_id].th = std::thread(&Server::process_client, this, tmp_id);
+		}
+		else
+		{
+			std::string msg("Server is full. Try connecting later");
+			send(incoming, msg.c_str(), strlen(msg.c_str()), 0);
+			closesocket(incoming);
 		}
 	}
+}
 
-	// extract ip address and port of the new client: deal with both IPV4 and IPV6
-	char ipstr[INET6_ADDRSTRLEN];
-	int clientport{};
-	if (clientAddr.sa_family == AF_INET)
-	{
-		struct sockaddr_in* s = (struct sockaddr_in*)&clientAddr;
-		clientport = ntohs(s->sin_port);
-		inet_ntop(AF_INET, &s->sin_addr, ipstr, sizeof(ipstr));
-	}
-	else // means ipv6
-	{
-		struct sockaddr_in6* s = (struct sockaddr_in6*)&clientAddr;
-		clientport = ntohs(s->sin6_port);
-		inet_ntop(AF_INET6, &s->sin6_addr, ipstr, sizeof(ipstr));
-	}
-	std::cout << "Client ip address: " << ipstr << ", client port: " << clientport << std::endl;
-	if (tmp_id != -1)
-	{
-		// send the id to the client:
-		std::string msg{ std::to_string(tmp_id) };
-		send(incoming, msg.c_str(), strlen(msg.c_str()), 0);
+bool Server::GetNewPlayer()
+{
+	currentPlayer = (currentPlayer + 1) % (GetClientCount() + 1);
+	std::string message{ "P " + std::to_string(currentPlayer - 1) };
+	Send(message);
 
-		// add the client to the clientinfo list:
-		mClients[tmp_id].set(tmp_id, incoming, clientAddr);
-		//mClients[tmp_id].th = std::thread(process_client, tmp_id, std::ref(mClients));
+	if (currentPlayer == 0)
+	{
+		return true;
 	}
 	else
 	{
-		std::string msg("Server is full. Try connecting later");
-		send(incoming, msg.c_str(), strlen(msg.c_str()), 0);
-		closesocket(incoming);
+		return false;
 	}
-	return true;
 }
 #pragma endregion
 
 #pragma region Client
+
+bool Client::Send(std::string message)
+{
+	if (send(mServer.socket, message.c_str(), strlen(message.c_str()), 0) < 0)
+	{
+		std::cout << "send() failed " << WSAGetLastError() << std::endl;
+		return false;
+	}
+	return true;
+}
+
+void Client::processReceives()
+{
+	std::unique_lock<std::mutex> lock{ m, std::defer_lock };
+	while (true)
+	{
+		memset(mServer.receivedMsg, 0, Default_BUFLEN);
+		if (mServer.socket != INVALID_SOCKET)
+		{
+			int iResult = recv(mServer.socket, mServer.receivedMsg, Default_BUFLEN, 0);
+			if (iResult != SOCKET_ERROR)
+			{
+				std::string recievedMessage = std::string(mServer.receivedMsg);
+				if (recievedMessage == "Play")
+				{
+					*mGameState = GameState::Play;
+				}
+				else
+				{
+					if (lock.try_lock())
+					{
+						for (std::string message : backlog)
+						{
+							messages.push_back(message);
+						}
+						backlog.clear();
+						messages.push_back(recievedMessage);
+						lock.unlock();
+					}
+					else
+					{
+						backlog.push_back(recievedMessage);
+					}
+				}
+			}
+			else
+			{
+				std::cout << "recv() failed: error = " << WSAGetLastError() << std::endl;
+				break;
+			}
+		}
+	} // while 
+
+	if (WSAGetLastError() == WSAECONNRESET)
+		std::cout << "The server has disconnected\n";
+}
+
 void Client::StaticInitialize()
 {
 	XASSERT(ClientInstance == nullptr, "Client already initialized!");
@@ -272,7 +364,7 @@ bool Client::Startup()
 	struct sockaddr_in server_address;
 	server_address.sin_family = AF_INET;
 	server_address.sin_port = htons(mDefaultPort);
-	if (inet_pton(AF_INET, "10.197.221.153", &server_address.sin_addr) <= 0)
+	if (inet_pton(AF_INET, "127.0.0.1", &server_address.sin_addr) <= 0)
 	{
 		errNdie("inet_pton error\n");
 		return false;
@@ -300,7 +392,7 @@ bool Client::Startup()
 	if (message != "Server is full")
 	{
 		mServer.id = atoi(mServer.receivedMsg);
-		std::thread receiveThread = std::thread(processReceives, std::ref(mServer));
+		mReceiveThread = std::thread(&Client::processReceives, this);
 	}
 	else
 	{

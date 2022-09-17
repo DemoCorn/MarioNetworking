@@ -11,6 +11,8 @@ public:
 	X::Math::Vector2 ConvertToScreenPosition(const X::Math::Vector2& WorldPosition) const;
 	X::Math::Vector2 ConvertToWorldPosition(const X::Math::Vector2& ScreenPosition) const;
 
+	void Reset() { mOffset = {}; }
+
 	void SetViewBound(const X::Math::Rect& ViewBound);
 	void SetViewPosition(const X::Math::Vector2& ViewPosition);
 
