@@ -254,7 +254,7 @@ void CollisionCheck()
 
 	for (int i = 0; i < (int)GoombaList.size(); i++)
 	{
-		if (GoombaList[i].isLoading)
+		if (!GoombaList[i].isLoading)
 		{
 			if (Math::Intersect(mario.GetBoundingBox(), GoombaList[i].GetBoundingBox()))
 			{
