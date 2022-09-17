@@ -53,6 +53,7 @@ void Server::process_client(int id)
 
 	ClientInfo& client = mClients[id];
 	// client chat session
+	active[id] = true;
 	while (true)
 	{
 		memset(tmpmsg, 0, Default_BUFLEN);
@@ -77,13 +78,13 @@ void Server::process_client(int id)
 					{
 						backlog.push_back(tmpmsg);
 					}
-				}
 
-				//broadcast the msg to the other clients:
-				for (int i = 0; i < mClients.size(); ++i)
-				{
-					if (mClients[i].socket != INVALID_SOCKET && client.id != i)
-						send(mClients[i].socket, msg.c_str(), strlen(msg.c_str()), 0);
+					//broadcast the msg to the other clients:
+					for (int i = 0; i < mClients.size(); ++i)
+					{
+						if (mClients[i].socket != INVALID_SOCKET && client.id != i)
+							send(mClients[i].socket, tmpmsg, strlen(tmpmsg), 0);
+					}
 				}
 			}
 			else // means this client socket is not alive anymore
@@ -94,7 +95,7 @@ void Server::process_client(int id)
 				mClients[client.id].socket = INVALID_SOCKET;
 
 				// broadcast the disconnection messsage to the other clients
-				for (int i = 0; i < MAX_CLIENTS; ++i)
+				for (int i = 0; i < mClients.size(); ++i)
 				{
 					if ((mClients[i].socket != INVALID_SOCKET))
 						send(mClients[i].socket, msg.c_str(), strlen(msg.c_str()), 0);

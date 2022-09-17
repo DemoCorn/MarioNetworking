@@ -29,6 +29,7 @@ float goombaTimer = 0.0f;
 std::string ip;
 bool isServer = false;
 bool isPlayer = false;
+int currentPlayer = 0;
 
 using namespace X;
 
@@ -88,6 +89,8 @@ void ResolveMessage(std::vector<std::string> message)
 			{
 				isPlayer = false;
 			}
+
+			currentPlayer = stoi(message[1]) + 1;
 		}
 	}
 	else if (message[0] == "S")
@@ -117,7 +120,27 @@ void DrawScore()
 	for (int i = 0; i < scores.size(); i++)
 	{
 		std::string scoreMessage = "P" + std::to_string(i+1) + ": " + std::to_string(scores[i]);
-		DrawScreenText(scoreMessage.c_str(), (spacePerScore / 2) + (spacePerScore * i) - 20.0f, 10.0f, 20.0f, Colors::White);
+
+		if (isServer && i == 0)
+		{
+			scoreMessage += " (you)";
+		}
+		else if (!isServer)
+		{
+			if (Client::Get().GetClientID() + 1 == i)
+			{
+				scoreMessage += " (you)";
+			}
+		}
+
+		if (i == currentPlayer)
+		{
+			DrawScreenText(scoreMessage.c_str(), (spacePerScore / 2) + (spacePerScore * i) - 20.0f, 10.0f, 20.0f, Colors::Yellow);
+		}
+		else
+		{
+			DrawScreenText(scoreMessage.c_str(), (spacePerScore / 2) + (spacePerScore * i) - 20.0f, 10.0f, 20.0f, Colors::White);
+		}
 	}
 }
 
